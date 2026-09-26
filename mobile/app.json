@@ -1,0 +1,7 @@
+{
+  "expo": {
+    "name": "CHROMORA", "slug": "chromora", "version": "0.1.0", "orientation": "portrait", "userInterfaceStyle": "dark",
+    "android": { "package": "com.chromora.sih" }, "ios": { "bundleIdentifier": "com.chromora.sih" },
+    "plugins": [["expo-image-picker", { "photosPermission": "Allow Chromora to select field-test evidence.", "cameraPermission": "Allow Chromora to capture field-test evidence." }], ["expo-location", { "locationWhenInUsePermission": "Allow Chromora to capture the field-test location when an officer explicitly requests it." }]]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "chromora",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "backend": "npm --prefix backend run dev",
+    "web": "npm --prefix web run dev",
+    "mobile": "npm --prefix mobile run start"
+  }
+}

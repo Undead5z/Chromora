@@ -1,0 +1,42 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment files: examples are intentionally versioned
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# Expo and runtime caches
+.expo/
+.expo-shared/
+*.log
+*.tmp
+*.temp
+*.cache
+
+# Local SQLite runtime data
+backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
+backend/data/keys/
+
+# Private evidence and generated reports
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/uploads/reports/*
+*.jpg
+*.jpeg
+*.png
+*.webp
+!web/public/favicon.svg
+
+# Editor and operating-system files
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
