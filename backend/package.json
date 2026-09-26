@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "main": "src/server.js",
-  "scripts": { "dev": "node --watch src/server.js", "start": "node src/server.js", "test": "node --test", "init-db": "node src/db/init.js" },
+  "scripts": { "dev": "node --watch src/server.js", "start": "node src/server.js", "test": "node --test", "init-db": "node src/db/init.js", "seed-demo": "node scripts/seed-demo.js", "reset-demo": "node scripts/reset-demo.js" },
   "dependencies": { "bcryptjs": "^2.4.3", "better-sqlite3": "^13.0.3", "cors": "^2.8.5", "dotenv": "^16.4.7", "express": "^4.21.2", "jsonwebtoken": "^9.0.2", "morgan": "^1.10.0", "multer": "^1.4.5-lts.1", "sharp": "^0.33.5", "zod": "^3.24.2" }
 }

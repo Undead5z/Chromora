@@ -1,18 +1,3 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { sha256File, signRecord, verifyRecord } = require('../src/services/integrity.service');
-
-test('signs and verifies the original evidence fingerprint', () => {
-  const evidence = path.join(os.tmpdir(), `chromora-integrity-${process.pid}.bin`);
-  fs.writeFileSync(evidence, 'chromora integrity test');
-  const record = { test_number: 'FT-TEST-0001', operator_id: 'operator-1', captured_at: '2026-01-01T00:00:00.000Z', latitude: null, longitude: null, location_accuracy: null, image_sha256: sha256File(evidence), test_profile: 'GENERAL_COLORIMETRIC_DEMO', presumptive_result: 'ANALYSIS_PENDING' };
-  const signed = signRecord(record);
-  record.record_signature = signed.signature;
-  const verified = verifyRecord(record, evidence);
-  assert.equal(signed.algorithm, 'ECDSA_P256_SHA256');
-  assert.equal(verified.status, 'VERIFIED');
-  fs.rmSync(evidence, { force: true });
-});
+const test=require('node:test'); const assert=require('node:assert/strict'); const fs=require('fs'); const os=require('os'); const path=require('path'); const {sha256File,signRecord,verifyRecord}=require('../src/services/integrity.service');
+function make(file){return {test_number:'FT-TEST-0001',operator_id:'operator-1',captured_at:'2026-01-01T00:00:00.000Z',latitude:null,longitude:null,location_accuracy:null,image_sha256:sha256File(file),test_profile:'DEMO_COLORIMETRIC_A',capture_quality:'ACCEPTABLE',reference_card_status:'NOT_IMPLEMENTED',presumptive_result:'ANALYSIS_PENDING',classification_confidence:null,analysis_source:'LIVE_CAPTURE',signed_payload_version:1};}
+test('integrity detects image and signed payload changes and accepts re-signing',()=>{const evidence=path.join(os.tmpdir(),`chromora-${process.pid}.bin`);fs.writeFileSync(evidence,'original');const record=make(evidence);record.record_signature=signRecord(record).signature;assert.equal(verifyRecord(record,evidence).status,'VERIFIED');record.capture_quality='REVIEW_RECOMMENDED';assert.equal(verifyRecord(record,evidence).status,'SIGNATURE_INVALID');record.record_signature=signRecord(record).signature;assert.equal(verifyRecord(record,evidence).status,'VERIFIED');fs.appendFileSync(evidence,'tampered');assert.equal(verifyRecord(record,evidence).status,'HASH_MISMATCH');fs.rmSync(evidence,{force:true});});

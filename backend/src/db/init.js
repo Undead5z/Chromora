@@ -5,13 +5,20 @@ const bcrypt = require('bcryptjs');
 const db = require('./database');
 const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
 db.exec(schema);
-const email = 'admin@chromora.local';
-if (!db.prepare('SELECT id FROM users WHERE email = ?').get(email)) {
-  db.prepare('INSERT INTO users (id, full_name, email, password_hash, role, employee_id, department) VALUES (?, ?, ?, ?, ?, ?, ?)')
-    .run(crypto.randomUUID(), 'Chromora Administrator', email, bcrypt.hashSync('Chromora123!', 12), 'ADMIN', 'CHROMORA-ADMIN', 'Narcotics Control Bureau');
-  console.log('Created local development admin: admin@chromora.local / Chromora123!');
+for (const column of [
+  "analysis_source TEXT NOT NULL DEFAULT 'LIVE_CAPTURE'",
+  "data_origin TEXT NOT NULL DEFAULT 'LIVE_CAPTURE'",
+  'demo_scenario TEXT',
+  'signed_payload_version INTEGER NOT NULL DEFAULT 1'
+]) { try { db.exec(`ALTER TABLE test_records ADD COLUMN ${column}`); } catch (error) { if (!/duplicate column/i.test(error.message)) throw error; } }
+function ensureUser({ fullName, email, password, role, employeeId }) {
+  if (!db.prepare('SELECT id FROM users WHERE email = ?').get(email)) db.prepare('INSERT INTO users (id,full_name,email,password_hash,role,account_status,employee_id,department) VALUES (?,?,?,?,?,?,?,?)')
+    .run(crypto.randomUUID(), fullName, email, bcrypt.hashSync(password, 12), role, 'APPROVED', employeeId, 'Narcotics Control Bureau');
 }
-if (!db.prepare('SELECT id FROM test_profiles WHERE code = ?').get('GENERAL_COLORIMETRIC_DEMO')) {
-  db.prepare('INSERT INTO test_profiles (id, code, display_name, status, description) VALUES (?, ?, ?, ?, ?)')
-    .run(crypto.randomUUID(), 'GENERAL_COLORIMETRIC_DEMO', 'General colourimetric field test', 'DEMO_PROFILE_ONLY', 'Workflow placeholder only. It is not a validated test profile or classifier.');
-}
+ensureUser({ fullName: 'Chromora Administrator', email: 'admin@chromora.local', password: 'Chromora123!', role: 'ADMIN', employeeId: 'CHROMORA-ADMIN' });
+ensureUser({ fullName: 'Arjun Rao', email: 'officer1@chromora.local', password: 'Officer123!', role: 'FIELD_OFFICER', employeeId: 'NCB-DEMO-FO-01' });
+ensureUser({ fullName: 'Meera Singh', email: 'officer2@chromora.local', password: 'Officer123!', role: 'FIELD_OFFICER', employeeId: 'NCB-DEMO-FO-02' });
+for (const profile of [
+  ['GENERAL_COLORIMETRIC_DEMO', 'General colourimetric field test', 'Workflow placeholder only. It is not a validated test profile or classifier.'],
+  ['DEMO_COLORIMETRIC_A', 'Chromora Demonstration Profile A', 'Synthetic profile used only to demonstrate the Chromora workflow. Not validated for any operational field drug-testing kit.']
+]) if (!db.prepare('SELECT id FROM test_profiles WHERE code=?').get(profile[0])) db.prepare('INSERT INTO test_profiles (id,code,display_name,status,description) VALUES (?,?,?,?,?)').run(crypto.randomUUID(), profile[0], profile[1], 'DEMO_PROFILE_ONLY', profile[2]);

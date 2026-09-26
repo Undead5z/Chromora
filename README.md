@@ -95,11 +95,30 @@ The helper writes `mobile/.env` using the active Windows LAN IPv4. A physical ph
 Development sign-in:
 
 ```text
-Email: admin@chromora.local
-Password: Chromora123!
+Web Admin: admin@chromora.local / Chromora123!
+Mobile Officer: officer1@chromora.local / Officer123!
+Mobile Officer: officer2@chromora.local / Officer123!
 ```
 
-This account is only for local development and must be changed or removed before any non-local use.
+These are local demo identities only and must be changed or removed before any non-local use.
+
+## Optional synthetic demo data
+
+The repository does not ship real test records or evidence. For PPT/YouTube demonstration only, generate explicitly labelled synthetic records and synthetic colour-card images:
+
+```powershell
+cd backend
+npm run seed-demo
+```
+
+Seeded records have `data_origin = DEMO_SEED`, `analysis_source = DEMO_SEED`, and visible **DEMO DATA** provenance. Their Positive/Negative/Inconclusive states are manually seeded UI states, not classifier outputs and not genuine NCB records. One record is deliberately modified after signing so Verify Evidence detects a real hash mismatch.
+
+Remove only synthetic demo records and evidence with:
+
+```powershell
+cd backend
+npm run reset-demo
+```
 
 ## Project structure
 

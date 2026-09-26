@@ -20,12 +20,18 @@ const safeUser = user => ({ id: user.id, fullName: user.full_name, email: user.e
 const recordWithOperator = id => db.prepare('SELECT t.*, u.full_name operator_name, u.email operator_email FROM test_records t JOIN users u ON u.id=t.operator_id WHERE t.id=?').get(id);
 const imagePathFor = record => path.resolve(env.rootDir, record.original_image_path || '');
 const usableEvidencePath = record => { const file = imagePathFor(record); const root = path.resolve(env.uploadDir); if (!record.original_image_path || path.relative(root, file).startsWith('..') || !fs.existsSync(file)) throw new AppError(404, 'Evidence image unavailable.'); return file; };
+const canAccess = (req, record) => ['ADMIN','MASTER_ADMIN'].includes(req.user.role) || record.operator_id === req.user.sub;
+const requireRecordAccess = (req, record) => { if (!record) throw new AppError(404, 'Test record not found.'); if (!canAccess(req, record)) throw new AppError(403, 'You do not have permission to access this field test.'); return record; };
+const reSign = (id, actor, action) => { const record = recordWithOperator(id); if (!record.image_sha256) return record; const signed = signRecord(record); db.prepare('UPDATE test_records SET record_signature=?,signature_algorithm=?,signed_payload_version=?,integrity_status=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').run(signed.signature,signed.algorithm,signed.signedPayloadVersion,'VERIFIED',id); audit(action,actor,id,{ signedPayloadVersion:signed.signedPayloadVersion }); return recordWithOperator(id); };
 
 router.post('/auth/login', asyncHandler((req, res) => {
   const input = z.object({ email: z.string().email(), password: z.string().min(1), application: z.enum(['WEB', 'MOBILE']) }).parse(req.body);
   const user = db.prepare('SELECT * FROM users WHERE lower(email)=lower(?)').get(input.email);
   if (!user || !bcrypt.compareSync(input.password, user.password_hash)) throw new AppError(401, 'Invalid email or password.');
-  const token = jwt.sign({ sub: user.id, role: user.role }, env.jwtSecret, { expiresIn: '8h' });
+  if (user.account_status !== 'APPROVED') throw new AppError(403, 'Your account is not approved for access.');
+  const allowed = input.application === 'WEB' ? ['MASTER_ADMIN','ADMIN'] : ['FIELD_OFFICER'];
+  if (!allowed.includes(user.role)) throw new AppError(403, input.application === 'WEB' ? 'Field Officer accounts must use the Chromora mobile companion.' : 'Administrator accounts must use the Chromora Web Command Centre.');
+  const token = jwt.sign({ sub: user.id, role: user.role, application: input.application }, env.jwtSecret, { expiresIn: '8h' });
   audit('LOGIN_SUCCESS', user.id);
   res.json({ token, user: safeUser(user) });
 }));
@@ -46,18 +52,21 @@ router.get('/dashboard', requireAuth, roles('ADMIN', 'MASTER_ADMIN'), (req, res)
   const integrityIssues = db.prepare("SELECT count(*) count FROM test_records WHERE integrity_status IN ('HASH_MISMATCH','SIGNATURE_INVALID')").get().count;
   const byResult = db.prepare('SELECT presumptive_result result, count(*) count FROM test_records GROUP BY presumptive_result').all();
   const locations = db.prepare('SELECT id, test_number, latitude, longitude, location_accuracy, captured_at FROM test_records WHERE latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY captured_at DESC LIMIT 50').all();
-  const recent = db.prepare('SELECT t.id,t.test_number,t.presumptive_result,t.integrity_status,t.captured_at,u.full_name operator_name FROM test_records t JOIN users u ON u.id=t.operator_id ORDER BY t.created_at DESC LIMIT 8').all();
-  res.json({ summary: { totalRecords, analysisPending, integrityVerified, integrityIssues }, byResult, locations, recent });
+  const recent = db.prepare('SELECT t.id,t.test_number,t.presumptive_result,t.integrity_status,t.data_origin,t.demo_scenario,t.captured_at,u.full_name operator_name FROM test_records t JOIN users u ON u.id=t.operator_id ORDER BY t.created_at DESC LIMIT 8').all();
+  const dailyActivity = db.prepare("WITH RECURSIVE days(day) AS (SELECT date('now','-6 days') UNION ALL SELECT date(day,'+1 day') FROM days WHERE day < date('now')) SELECT day date, count(t.id) count FROM days LEFT JOIN test_records t ON date(t.captured_at)=day GROUP BY day ORDER BY day").all();
+  const demoActive = db.prepare("SELECT count(*) count FROM test_records WHERE data_origin='DEMO_SEED'").get().count > 0;
+  res.json({ summary: { totalRecords, analysisPending, integrityVerified, integrityIssues }, byResult, locations, recent, dailyActivity, demoActive });
 });
 
 router.get('/test-records', requireAuth, asyncHandler((req, res) => {
-  const search = `%${String(req.query.search || '').trim()}%`;
-  const records = db.prepare(`SELECT t.*, u.full_name operator_name FROM test_records t JOIN users u ON u.id=t.operator_id WHERE t.test_number LIKE ? OR u.full_name LIKE ? ORDER BY t.created_at DESC`).all(search, search);
-  res.json({ records });
+  const params=[]; let where='WHERE (t.test_number LIKE ? OR u.full_name LIKE ?)'; const search=`%${String(req.query.search||'').trim()}%`; params.push(search,search);
+  if (req.user.role === 'FIELD_OFFICER') { where+=' AND t.operator_id=?'; params.push(req.user.sub); }
+  for (const [field,key] of [['t.presumptive_result','result'],['t.integrity_status','integrity'],['t.data_origin','origin']]) if (req.query[key] && req.query[key] !== 'ALL') { where+=` AND ${field}=?`; params.push(req.query[key]); }
+  if (req.query.from) { where+=' AND date(t.captured_at)>=date(?)'; params.push(req.query.from); } if (req.query.to) { where+=' AND date(t.captured_at)<=date(?)'; params.push(req.query.to); }
+  const records=db.prepare(`SELECT t.*,u.full_name operator_name FROM test_records t JOIN users u ON u.id=t.operator_id ${where} ORDER BY t.captured_at DESC`).all(...params); res.json({records});
 }));
 router.get('/test-records/:id', requireAuth, asyncHandler((req, res) => {
-  const record = recordWithOperator(req.params.id);
-  if (!record) throw new AppError(404, 'Test record not found.');
+  const record = requireRecordAccess(req, recordWithOperator(req.params.id));
   res.json({ record });
 }));
 router.post('/test-records', requireAuth, roles('FIELD_OFFICER', 'ADMIN', 'MASTER_ADMIN'), asyncHandler((req, res) => {
@@ -74,35 +83,31 @@ router.post('/test-records', requireAuth, roles('FIELD_OFFICER', 'ADMIN', 'MASTE
   res.status(201).json({ record: recordWithOperator(id) });
 }));
 router.post('/test-records/:id/evidence', requireAuth, roles('FIELD_OFFICER', 'ADMIN', 'MASTER_ADMIN'), upload.single('image'), asyncHandler(async (req, res) => {
-  const record = recordWithOperator(req.params.id);
-  if (!record) throw new AppError(404, 'Test record not found.');
+  const record = requireRecordAccess(req, recordWithOperator(req.params.id));
   if (!req.file) throw new AppError(400, 'An evidence image is required.');
   const metadata = await sharp(req.file.path).metadata();
   const quality = metadata.width >= 800 && metadata.height >= 600 ? 'ACCEPTABLE' : 'REVIEW_RECOMMENDED';
   const relativePath = path.relative(env.rootDir, req.file.path).replace(/\\/g, '/');
   const imageHash = sha256File(req.file.path);
   db.prepare('UPDATE test_records SET original_image_path=?, image_sha256=?, capture_quality=?, integrity_status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(relativePath, imageHash, quality, 'PENDING', record.id);
-  const unsignedRecord = recordWithOperator(record.id);
-  const signed = signRecord(unsignedRecord);
-  db.prepare('UPDATE test_records SET record_signature=?, signature_algorithm=?, integrity_status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(signed.signature, signed.algorithm, 'VERIFIED', record.id);
-  audit('TEST_EVIDENCE_HASHED_AND_SIGNED', req.user.sub, record.id, { width: metadata.width, height: metadata.height, quality, hashAlgorithm: 'SHA-256', signatureAlgorithm: signed.algorithm });
-  res.json({ record: recordWithOperator(record.id), imageQuality: { state: quality, message: quality === 'ACCEPTABLE' ? 'Basic image dimensions are acceptable.' : 'Image may be too small; a retake is recommended.' } });
+  const reSigned = reSign(record.id, req.user.sub, 'TEST_EVIDENCE_HASHED_AND_SIGNED');
+  audit('TEST_EVIDENCE_STORED', req.user.sub, record.id, { width: metadata.width, height: metadata.height, quality, hashAlgorithm: 'SHA-256', signatureAlgorithm: reSigned.signature_algorithm });
+  res.json({ record: reSigned, imageQuality: { state: quality, message: quality === 'ACCEPTABLE' ? 'Basic image dimensions are acceptable.' : 'Image may be too small; a retake is recommended.' } });
 }));
-router.get('/test-records/:id/evidence', requireAuth, asyncHandler((req, res) => { const record = recordWithOperator(req.params.id); if (!record) throw new AppError(404, 'Test record not found.'); res.sendFile(usableEvidencePath(record)); }));
+router.get('/test-records/:id/evidence', requireAuth, asyncHandler((req, res) => { const record = requireRecordAccess(req, recordWithOperator(req.params.id)); res.sendFile(usableEvidencePath(record)); }));
 router.post('/test-records/:id/verify-integrity', requireAuth, asyncHandler((req, res) => {
-  const record = recordWithOperator(req.params.id);
-  if (!record) throw new AppError(404, 'Test record not found.');
+  const record = requireRecordAccess(req, recordWithOperator(req.params.id));
   const verification = verifyRecord(record, usableEvidencePath(record));
   db.prepare('UPDATE test_records SET integrity_status=?, updated_at=CURRENT_TIMESTAMP WHERE id=?').run(verification.status, record.id);
   audit('EVIDENCE_INTEGRITY_VERIFIED', req.user.sub, record.id, { status: verification.status });
   res.json({ verification, record: recordWithOperator(record.id) });
 }));
 router.get('/test-records/:id/verification', requireAuth, asyncHandler((req, res) => {
-  const record = recordWithOperator(req.params.id); if (!record) throw new AppError(404, 'Test record not found.');
+  const record = requireRecordAccess(req, recordWithOperator(req.params.id));
   res.json({ verification: { testNumber: record.test_number, integrityStatus: record.integrity_status, imageSha256: record.image_sha256, signatureAlgorithm: record.signature_algorithm, verificationCode: `CHR:${record.id}` } });
 }));
 router.post('/test-records/:id/analyze', requireAuth, asyncHandler((req, res) => {
-  const record = recordWithOperator(req.params.id); if (!record) throw new AppError(404, 'Test record not found.');
+  const record = requireRecordAccess(req, recordWithOperator(req.params.id));
   const steps = [
     { key: 'IMAGE_QUALITY', state: record.capture_quality === 'ACCEPTABLE' ? 'COMPLETE' : record.capture_quality === 'REVIEW_RECOMMENDED' ? 'WARNING' : 'PENDING', detail: 'Basic capture dimensions checked.' },
     { key: 'REFERENCE_CARD', state: 'NOT_IMPLEMENTED', detail: 'Reference-card detection is not implemented.' },

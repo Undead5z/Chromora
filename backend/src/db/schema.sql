@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS test_records (
   captured_at TEXT, latitude REAL, longitude REAL, location_accuracy REAL, original_image_path TEXT,
   image_sha256 TEXT, record_signature TEXT, signature_algorithm TEXT, integrity_status TEXT NOT NULL DEFAULT 'PENDING',
   reference_card_status TEXT NOT NULL DEFAULT 'NOT_IMPLEMENTED', capture_quality TEXT NOT NULL DEFAULT 'PENDING',
-  classification_confidence REAL, presumptive_result TEXT NOT NULL DEFAULT 'ANALYSIS_PENDING', notes TEXT,
+  classification_confidence REAL, presumptive_result TEXT NOT NULL DEFAULT 'ANALYSIS_PENDING', analysis_source TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', data_origin TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', demo_scenario TEXT, signed_payload_version INTEGER NOT NULL DEFAULT 1, notes TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(operator_id) REFERENCES users(id)
 );
