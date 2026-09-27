@@ -46,6 +46,7 @@ const upload = multer({
 
 router.get('/test-profiles', requireAuth, (req, res) => res.json({ profiles: db.prepare('SELECT code, display_name, status, description FROM test_profiles ORDER BY display_name').all() }));
 router.get('/dashboard', requireAuth, roles('ADMIN', 'MASTER_ADMIN'), (req, res) => {
+  const range = [7, 30, 90].includes(Number(req.query.range)) ? Number(req.query.range) : 7;
   const totalRecords = db.prepare('SELECT count(*) count FROM test_records').get().count;
   const analysisPending = db.prepare("SELECT count(*) count FROM test_records WHERE presumptive_result='ANALYSIS_PENDING'").get().count;
   const integrityVerified = db.prepare("SELECT count(*) count FROM test_records WHERE integrity_status='VERIFIED'").get().count;
@@ -53,9 +54,19 @@ router.get('/dashboard', requireAuth, roles('ADMIN', 'MASTER_ADMIN'), (req, res)
   const byResult = db.prepare('SELECT presumptive_result result, count(*) count FROM test_records GROUP BY presumptive_result').all();
   const locations = db.prepare('SELECT id, test_number, latitude, longitude, location_accuracy, captured_at FROM test_records WHERE latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY captured_at DESC LIMIT 50').all();
   const recent = db.prepare('SELECT t.id,t.test_number,t.presumptive_result,t.integrity_status,t.data_origin,t.demo_scenario,t.captured_at,u.full_name operator_name FROM test_records t JOIN users u ON u.id=t.operator_id ORDER BY t.created_at DESC LIMIT 8').all();
-  const dailyActivity = db.prepare("WITH RECURSIVE days(day) AS (SELECT date('now','-6 days') UNION ALL SELECT date(day,'+1 day') FROM days WHERE day < date('now')) SELECT day date, count(t.id) count FROM days LEFT JOIN test_records t ON date(t.captured_at)=day GROUP BY day ORDER BY day").all();
+  const dailyActivity = db.prepare(`WITH RECURSIVE days(day) AS (SELECT date('now','-${range - 1} days') UNION ALL SELECT date(day,'+1 day') FROM days WHERE day < date('now')) SELECT day date, count(t.id) count FROM days LEFT JOIN test_records t ON date(t.captured_at)=day GROUP BY day ORDER BY day`).all();
   const demoActive = db.prepare("SELECT count(*) count FROM test_records WHERE data_origin='DEMO_SEED'").get().count > 0;
-  res.json({ summary: { totalRecords, analysisPending, integrityVerified, integrityIssues }, byResult, locations, recent, dailyActivity, demoActive });
+  const presentation = demoActive ? {
+    summary: { totalRecords: 48, positive: 12, negative: 28, inconclusive: 8, integrityVerified: 11, integrityTotal: 11, excludedTamperScenario: true },
+    dailyActivity: [10, 10, 17, 18, 8, 20, 30].map((count, index) => ({ date: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index], count })),
+    locations: [
+      { label: 'Delhi', latitude: 28.6139, longitude: 77.2090 },
+      { label: 'Mumbai', latitude: 19.0760, longitude: 72.8777 },
+      { label: 'Jaipur', latitude: 26.9124, longitude: 75.7873 }
+    ],
+    recent: recent.slice(0, 3).map((record, index) => ({ ...record, test_number: ['FT-2024-001', 'FT-2024-002', 'FT-2024-003'][index], location_label: ['Delhi', 'Mumbai', 'Jaipur'][index], presumptive_result: ['NEGATIVE', 'INCONCLUSIVE', 'POSITIVE'][index], captured_label: ['12 Dec 2024, 14:32', '12 Dec 2024, 11:20', '12 Dec 2024, 09:15'][index] }))
+  } : null;
+  res.json({ range, summary: { totalRecords, analysisPending, integrityVerified, integrityTotal: totalRecords, integrityIssues }, byResult, locations, recent, dailyActivity, demoActive, presentation });
 });
 
 router.get('/test-records', requireAuth, asyncHandler((req, res) => {

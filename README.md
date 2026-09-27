@@ -106,19 +106,19 @@ These accounts are seeded for **LOCAL PROTOTYPE DEVELOPMENT ONLY**. They are not
 
 - **Role:** Admin
 - **Email:** `admin@chromora.local`
-- **Password:** `Chromora123!`
+- **Password:** `Admin@123!`
 - **Access:** `http://localhost:5173/login`
 
 ### Mobile Field Companion
 
 - **Role:** Field Officer
 - **Email:** `officer1@chromora.local`
-- **Password:** `Officer123!`
+- **Password:** `Officer@123!`
 
 An optional second seeded Field Officer is also available:
 
 - **Email:** `officer2@chromora.local`
-- **Password:** `Officer123!`
+- **Password:** `Officer@123!`
 
 Web Admin credentials are intended for the Web Command Centre. Field Officer credentials are intended for the Expo Mobile application. Do not expose these credentials in screenshots or production deployments.
 
