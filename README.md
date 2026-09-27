@@ -66,7 +66,7 @@ npm run dev
 
 Backend health: `http://localhost:4000/api/health`
 
-The first start creates ignored local runtime data, including the SQLite database, local development signing keys, upload directories, a development admin account, and the demo-only profile.
+The API listens on all local LAN interfaces in development and prints its detected LAN URLs at startup. The first start creates ignored local runtime data, including the SQLite database, local development signing keys, upload directories, a development admin account, and the demo-only profile.
 
 ### Web
 
@@ -76,31 +76,73 @@ npm install
 npm run dev
 ```
 
-- Command Centre: `http://localhost:5173`
-- Product presentation: `http://localhost:5173/welcome`
+- Welcome / product presentation: `http://localhost:5173/` (also `/welcome`)
+- Web Admin login: `http://localhost:5173/login`
+- Command Centre dashboard: `http://localhost:5173/dashboard` after login
 
 ### Mobile
 
-For a physical phone, first write the current PC LAN API URL:
+In normal Expo LAN development, Chromora derives the current computer address from Expo's runtime host information, so a physical phone does not normally need a manually edited IP. Start Expo in LAN mode:
+
+```powershell
+cd mobile
+npm install
+npx expo start --clear --lan
+```
+
+The helper remains available as an explicit override when needed:
 
 ```powershell
 ./scripts/update-mobile-api-url.ps1
+```
+
+It selects an active Wi-Fi/Ethernet IPv4 address and writes `mobile/.env`. Do not commit that file; restart Expo after changing it. Because an `EXPO_PUBLIC_API_URL` override takes precedence, remove or update a stale `mobile/.env` to return to automatic Expo host detection. A physical phone must never use a silent `localhost` fallback.
+
+## Local Development Accounts
+
+These accounts are seeded for **LOCAL PROTOTYPE DEVELOPMENT ONLY**. They are not production credentials.
+
+### Web Command Centre
+
+- **Role:** Admin
+- **Email:** `admin@chromora.local`
+- **Password:** `Chromora123!`
+- **Access:** `http://localhost:5173/login`
+
+### Mobile Field Companion
+
+- **Role:** Field Officer
+- **Email:** `officer1@chromora.local`
+- **Password:** `Officer123!`
+
+An optional second seeded Field Officer is also available:
+
+- **Email:** `officer2@chromora.local`
+- **Password:** `Officer123!`
+
+Web Admin credentials are intended for the Web Command Centre. Field Officer credentials are intended for the Expo Mobile application. Do not expose these credentials in screenshots or production deployments.
+
+## Preferred local startup and LAN verification
+
+Use three terminals:
+
+```powershell
+# Terminal 1
+cd backend
+npm run dev
+
+# Terminal 2
+cd web
+npm run dev
+
+# Terminal 3
 cd mobile
-npm install
-npx expo start --lan --clear
+npx expo start --clear --lan
 ```
 
-The helper writes `mobile/.env` using the active Windows LAN IPv4. A physical phone must not use `localhost`.
+Verify the backend from the PC at `http://localhost:4000/api/health`, then use the LAN URL printed by the backend to open `http://<CURRENT-PC-IP>:4000/api/health` in the phone browser. If the PC check succeeds but the phone check fails, the remaining issue is LAN, router, or firewall configuration rather than React Native. Do not change the firewall automatically; confirm that Windows Firewall permits Node.js on private networks (for example, inspect matching inbound filters with `Get-NetFirewallRule -Enabled True -Direction Inbound | Get-NetFirewallApplicationFilter | Where-Object { $_.Program -like '*\\node.exe' }`).
 
-Development sign-in:
-
-```text
-Web Admin: admin@chromora.local / Chromora123!
-Mobile Officer: officer1@chromora.local / Officer123!
-Mobile Officer: officer2@chromora.local / Officer123!
-```
-
-These are local demo identities only and must be changed or removed before any non-local use.
+Web logout returns to `/login` so the administrator can sign in again, while `/` and `/welcome` remain publicly viewable for signed-in and signed-out users.
 
 ## Optional synthetic demo data
 
@@ -132,6 +174,7 @@ web/
   src/        React routes, dashboard, landing page, styles
 mobile/
   App.js      Expo field workflow
+  apiConfig.js Runtime LAN API resolution and health check
 scripts/
   update-mobile-api-url.ps1
 ```
