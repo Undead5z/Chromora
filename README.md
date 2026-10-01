@@ -112,15 +112,13 @@ These accounts are seeded for **LOCAL PROTOTYPE DEVELOPMENT ONLY**. They are not
 ### Mobile Field Companion
 
 - **Role:** Field Officer
-- **Email:** `officer1@chromora.local`
+- **Email:** `officer@chomora.local`
 - **Password:** `Officer@123!`
 
-An optional second seeded Field Officer is also available:
-
-- **Email:** `officer2@chromora.local`
-- **Password:** `Officer@123!`
 
 Web Admin credentials are intended for the Web Command Centre. Field Officer credentials are intended for the Expo Mobile application. Do not expose these credentials in screenshots or production deployments.
+
+The primary clean reset command is `cd backend; npm run reseed-prototype`. It creates 20 synthetic prototype records for demonstration only.
 
 ## Preferred local startup and LAN verification
 

@@ -1,14 +1,16 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY, full_name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('MASTER_ADMIN','ADMIN','FIELD_OFFICER')), account_status TEXT NOT NULL DEFAULT 'APPROVED',
-  employee_id TEXT, department TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  role TEXT NOT NULL CHECK(role IN ('MASTER_ADMIN','ADMIN','FIELD_OFFICER')), requested_role TEXT, account_status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+  employee_id TEXT, phone TEXT, department TEXT, designation TEXT, jurisdiction_region TEXT,
+  registered_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, approved_by TEXT, approved_at TEXT, rejected_by TEXT, rejected_at TEXT, approval_note TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS test_records (
   id TEXT PRIMARY KEY, test_number TEXT NOT NULL UNIQUE, test_profile TEXT, operator_id TEXT NOT NULL,
   captured_at TEXT, latitude REAL, longitude REAL, location_accuracy REAL, original_image_path TEXT,
   image_sha256 TEXT, record_signature TEXT, signature_algorithm TEXT, integrity_status TEXT NOT NULL DEFAULT 'PENDING',
   reference_card_status TEXT NOT NULL DEFAULT 'NOT_IMPLEMENTED', capture_quality TEXT NOT NULL DEFAULT 'PENDING',
-  classification_confidence REAL, presumptive_result TEXT NOT NULL DEFAULT 'ANALYSIS_PENDING', analysis_source TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', data_origin TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', demo_scenario TEXT, signed_payload_version INTEGER NOT NULL DEFAULT 1, notes TEXT,
+  classification_confidence REAL, presumptive_result TEXT NOT NULL DEFAULT 'ANALYSIS_PENDING', analysis_source TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', data_origin TEXT NOT NULL DEFAULT 'LIVE_CAPTURE', workflow_status TEXT NOT NULL DEFAULT 'ACTIVE', demo_scenario TEXT, signed_payload_version INTEGER NOT NULL DEFAULT 1, notes TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY(operator_id) REFERENCES users(id)
 );

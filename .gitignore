@@ -33,6 +33,7 @@ backend/uploads/reports/*
 *.png
 *.webp
 !web/public/favicon.svg
+!mobile/assets/chromora-mobile-background.png
 
 # Editor and operating-system files
 .vscode/
